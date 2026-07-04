@@ -40,6 +40,4 @@ jobs:
         run: pytest shared/insights_framework/tests/ -v
 
       - name: Run Audience A integration tests
-        run: |
-          cd audiences/audience_a
-          pytest tests/ -v
+        run: pytest audiences/audience_a/tests/ -v
