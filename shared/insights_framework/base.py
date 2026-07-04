@@ -66,6 +66,7 @@ class ModelAudience:
         print(f"[{self.audience_id}] Delivering to apps-db and Salesforce...")
         return True
 
+    
     def run(self, data):
         """Full pipeline — do not override. Override individual steps."""
         data   = self.explore(data)
@@ -79,6 +80,3 @@ class ModelAudience:
         self.deliver(scores)
         print(f"[{self.audience_id}] Pipeline complete.")
         return scores
-
-
-
