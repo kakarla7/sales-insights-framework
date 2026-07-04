@@ -1,0 +1,8 @@
+audience_id: AUDIENCE_A
+description: Audience A model — addition
+shared_version: ">=1.0.0,<2.0.0"
+model_version: "1.0.0"
+account_filter: "audience = 'A'"
+sf_sync_target: Audience_A_Queue__c
+delivery_sla: "08:00"
+operation: addition
