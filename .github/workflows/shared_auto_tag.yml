@@ -1,0 +1,42 @@
+name: Shared — auto tag on prod merge
+
+on:
+  push:
+    branches: [shared-prod]
+    paths: ["shared/**"]
+
+jobs:
+  auto_tag:
+    name: Cut shared tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with: {ref: shared-prod, fetch-depth: 0}
+      - uses: actions/setup-python@v4
+        with: {python-version: "3.11"}
+      - name: Install shared framework
+        run: pip install -e shared/
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+      - name: Read VERSION and cut tag
+        run: |
+          VERSION=$(cat shared/VERSION | tr -d "[:space:]")
+          TAG="shared-v${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "Tag ${TAG} already exists — bump VERSION to cut a new tag"
+            exit 1
+          fi
+          git tag $TAG
+          git push origin $TAG
+          echo "Tag cut: $TAG"
+      - name: Sync shared to audience IAT branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "shared-prod merged — audience branches will auto-sync via sync_shared workflow"
