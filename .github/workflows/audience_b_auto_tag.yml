@@ -1,0 +1,54 @@
+name: Audience B — auto tag on prod merge
+
+on:
+  push:
+    branches: [audience-b-prod]
+    paths: ["audiences/audience_b/**", "shared/**"]
+
+jobs:
+  auto_tag:
+    name: Cut audience-b tag + deploy to Databricks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with: {ref: audience-b-prod, fetch-depth: 0}
+      - uses: actions/setup-python@v4
+        with: {python-version: "3.11"}
+      - name: Install shared framework
+        run: pip install -e shared/
+      - name: Install pytest
+        run: pip install pytest pyyaml
+      - name: Verify install
+        run: python -c "import insights_framework; print('OK')"
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+      - name: Run Audience B integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/audiences/audience_b
+        run: pytest audiences/audience_b/tests/ -v
+      - name: Read VERSION files and cut tag
+        id: tag
+        run: |
+          SHARED_VER=$(cat shared/VERSION | tr -d "[:space:]")
+          AUDIENCE_VER=$(cat audiences/audience_b/VERSION | tr -d "[:space:]")
+          TAG="shared-v${SHARED_VER}--audience-b-v${AUDIENCE_VER}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "Tag ${TAG} already exists — bump VERSION to cut a new tag"
+            exit 1
+          fi
+          git tag $TAG
+          git push origin $TAG
+          echo "Tag cut: $TAG"
+      - name: Deploy to Databricks
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          pip install databricks-sdk
+          echo "Deploying ${{ steps.tag.outputs.tag }} to Databricks..."
