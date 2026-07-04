@@ -1,0 +1,98 @@
+name: Audience A — auto tag on prod merge
+
+on:
+  push:
+    branches:
+      - audience-a-prod
+    paths:
+      - "audiences/audience_a/**"
+      - "shared/**"
+
+jobs:
+  auto_tag:
+    name: Read VERSIONs and cut audience-a tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout audience-a-prod
+        uses: actions/checkout@v3
+        with:
+          ref: audience-a-prod
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Run audience_a integration tests
+        run: |
+          cd audiences/audience_a
+          pytest tests/ -v
+
+      - name: Read VERSION files
+        id: version
+        run: |
+          SHARED_VER=$(cat shared/VERSION | tr -d '[:space:]')
+          AUDIENCE_VER=$(cat audiences/audience_a/VERSION | tr -d '[:space:]')
+          TAG="shared-v${SHARED_VER}--audience-a-v${AUDIENCE_VER}"
+          echo "shared_ver=$SHARED_VER" >> $GITHUB_OUTPUT
+          echo "audience_ver=$AUDIENCE_VER" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Cutting tag: $TAG"
+
+      - name: Validate config.yaml shared_version matches VERSION file
+        run: |
+          CONFIG_VER=$(python3 -c "
+          import yaml
+          cfg = yaml.safe_load(open('audiences/audience_a/config.yaml'))
+          print(cfg['shared_version'])
+          ")
+          VERSION_VER="${{ steps.version.outputs.shared_ver }}"
+          if [ "$CONFIG_VER" != "$VERSION_VER" ]; then
+            echo "ERROR: config.yaml shared_version ($CONFIG_VER) != shared/VERSION ($VERSION_VER)"
+            echo "Update config.yaml to match before merging to prod"
+            exit 1
+          fi
+          echo "✓ Shared version matches: $CONFIG_VER"
+
+      - name: Check tag does not already exist
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "ERROR: Tag $TAG already exists. Bump VERSION file to cut a new tag."
+            exit 1
+          fi
+          echo "✓ Tag $TAG is new — proceeding"
+
+      - name: Cut tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Deploy to Databricks
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          pip install databricks-sdk
+          databricks bundle deploy --target prod
+
+      - name: Summary
+        run: |
+          echo "✓ Tag cut: ${{ steps.version.outputs.tag }}"
+          echo "✓ Databricks job deployed and scheduled"
