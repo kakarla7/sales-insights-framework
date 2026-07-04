@@ -1,66 +1,81 @@
-# Sales Insights Framework
+# sales-insights-framework
 
-Monorepo for the sales insights ML platform.
+Single monorepo. Three sets of branches — shared, audience-a, audience-b.
 
-## Structure
+## Branch structure
 
+| Branch set | Branches | Owns |
+|---|---|---|
+| Shared | shared-dev, shared-iat, shared-prod | shared/insights_framework |
+| Audience A | audience-a-dev, audience-a-iat, audience-a-prod | audiences/audience_a/ + shared/ (auto-synced) |
+| Audience B | audience-b-dev, audience-b-iat, audience-b-prod | audiences/audience_b/ + shared/ (auto-synced) |
+
+## What lives on each branch
+
+**shared-*** branches:
 ```
-sales-insights-framework/
-├── shared/
-│   └── insights_framework/     ← pip installable base package
-│       ├── base.py             ← ModelAudience base class
-│       ├── tests/              ← shared unit tests
-│       └── setup.py
-├── audiences/
-│   ├── sbs_client/             ← SBS Client: ADDITION (a + b)
-│   │   ├── config.yaml
-│   │   ├── model.py            ← class Model(ModelAudience)
-│   │   └── tests/
-│   └── sbs_prospect/           ← SBS Prospect: MULTIPLICATION (a * b)
-│       ├── config.yaml
-│       ├── model.py            ← class Model(ModelAudience)
-│       └── tests/
-└── .github/workflows/
-    ├── sbs_client_ci.yml       ← triggers on sbs-client-* branches
-    ├── sbs_prospect_ci.yml     ← triggers on sbs-prospect-* branches
-    └── tag_release.yml         ← triggers on tag push to prod
-```
-
-## Branch strategy
-
-| Audience | Dev | IAT | Prod |
-|---|---|---|---|
-| SBS Client | sbs-client-dev | sbs-client-iat | tag: sbs-client/v*.*.* |
-| SBS Prospect | sbs-prospect-dev | sbs-prospect-iat | tag: sbs-prospect/v*.*.* |
-
-## Walkthrough
-
-### Step 1: Feature branch
-```bash
-git checkout sbs-client-dev
-git checkout -b feature/my-change
-# make changes in audiences/sbs_client/model.py
-git push origin feature/my-change
-# raise PR to sbs-client-dev
+shared/
+  setup.py
+  VERSION
+  insights_framework/
+    __init__.py
+    base.py
+    tests/
+.github/workflows/
+  shared_ci.yml
+  shared_auto_tag.yml
+  sync_shared_to_audiences.yml
 ```
 
-### Step 2: PR to sbs-client-iat
-```bash
-# raise PR from sbs-client-dev → sbs-client-iat
-# CI auto-runs: shared unit tests + sbs_client integration tests
+**audience-a-*** branches:
+```
+shared/                        ← auto-synced from shared branches
+audiences/audience_a/
+  model.py                     ← class Model(ModelAudience)
+  config.yaml
+  VERSION
+  tests/
+.github/workflows/
+  audience_a_ci.yml
+  audience_a_auto_tag.yml
+  audience_a_revert_shared.yml
 ```
 
-### Step 3: Cut prod tag
-```bash
-git tag sbs-client/v1.0.0
-git push origin sbs-client/v1.0.0
-# tag_release.yml fires, runs tests, triggers prod
+**audience-b-*** branches: same pattern, audience_b only.
+
+## How it works
+
+### Shared changes
+```
+shared-dev → PR → shared-iat → CI runs → PR → shared-prod
+  → auto tag: shared-v1.0.1
+  → auto sync shared/ to audience-a-iat + audience-b-iat
+  → auto sync shared/ to audience-a-prod + audience-b-prod
+  → each audience CI runs
+  → pass: audience tag cut automatically
+  → fail: shared/ reverted on that audience branch, alert fires
+```
+
+### Audience changes
+```
+feature → PR → audience-a-dev → PR → audience-a-iat → CI runs
+  → PR → audience-a-prod
+  → auto tag: shared-v1.0.0--audience-a-v1.1.0
+  → Databricks deploys
+```
+
+### Tag format
+```
+shared-v1.0.0                          ← shared release
+shared-v1.0.0--audience-a-v1.1.0      ← audience-a release
+shared-v1.0.0--audience-b-v2.0.0      ← audience-b release
 ```
 
 ## Install and test locally
 ```bash
-pip install -e shared/insights_framework
+pip install -e shared/
 pytest shared/insights_framework/tests/ -v
-cd audiences/sbs_client && pytest tests/ -v
-cd audiences/sbs_prospect && pytest tests/ -v
+
+PYTHONPATH=audiences/audience_a pytest audiences/audience_a/tests/ -v
+PYTHONPATH=audiences/audience_b pytest audiences/audience_b/tests/ -v
 ```
