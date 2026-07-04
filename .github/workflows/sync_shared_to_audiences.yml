@@ -1,0 +1,49 @@
+name: Sync shared to audience branches
+
+on:
+  push:
+    branches: [shared-iat, shared-prod]
+    paths: ["shared/**"]
+
+jobs:
+  sync:
+    name: Sync shared/ to audience branches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        audience: [audience-a, audience-b]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine target branch
+        id: target
+        run: |
+          if [[ "${GITHUB_REF}" == *"shared-iat"* ]]; then
+            echo "branch=${{ matrix.audience }}-iat" >> $GITHUB_OUTPUT
+          else
+            echo "branch=${{ matrix.audience }}-prod" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync shared/ to ${{ steps.target.outputs.branch }}
+        run: |
+          TARGET="${{ steps.target.outputs.branch }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin $TARGET
+          git checkout $TARGET
+
+          git checkout ${GITHUB_REF#refs/heads/} -- shared/
+
+          if git diff --cached --quiet; then
+            echo "No shared changes to sync to $TARGET"
+          else
+            git commit -m "sync: shared/ updated from ${GITHUB_REF#refs/heads/}"
+            git push origin $TARGET
+            echo "Synced shared/ to $TARGET"
+          fi
