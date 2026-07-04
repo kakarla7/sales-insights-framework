@@ -1,0 +1,8 @@
+audience_id: AUDIENCE_B
+description: Audience B model — multiplication (a * b)
+shared_version: "1.0.0"
+model_version: "1.0.0"
+account_filter: "audience = 'B'"
+sf_sync_target: Audience_B_Queue__c
+delivery_sla: "08:00"
+operation: multiplication
