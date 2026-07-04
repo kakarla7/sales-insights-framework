@@ -1,0 +1,67 @@
+# Audience A — daily pipeline
+# Schedule: every day at 7AM ET
+# Delivers to reps by 8AM
+
+resources:
+  jobs:
+    audience_a_job:
+      name: "Audience A — daily pipeline"
+
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"   # 7AM every day
+        timezone_id: "America/New_York"
+        pause_status: UNPAUSED
+
+      git_source:
+        url: https://github.com/kakarla7/sales-insights-framework
+        provider: gitHub
+        branch: audience-a-prod
+
+      job_clusters:
+        - job_cluster_key: audience_a_cluster
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            spark_env_vars:
+              AUDIENCE_ID: "AUDIENCE_A"
+              SHARED_VERSION: "1.0.0"
+
+      tasks:
+        - task_key: install_packages
+          job_cluster_key: audience_a_cluster
+          spark_python_task:
+            python_file: jobs/scripts/install_packages.py
+            parameters: ["audience_a"]
+
+        - task_key: drift_check
+          depends_on:
+            - task_key: install_packages
+          job_cluster_key: audience_a_cluster
+          spark_python_task:
+            python_file: audiences/audience_a/detector.py
+            parameters: ["--config", "audiences/audience_a/config.yaml"]
+
+        - task_key: model_run
+          depends_on:
+            - task_key: drift_check
+          job_cluster_key: audience_a_cluster
+          spark_python_task:
+            python_file: audiences/audience_a/model.py
+            parameters: ["--config", "audiences/audience_a/config.yaml"]
+
+        - task_key: deliver
+          depends_on:
+            - task_key: model_run
+          job_cluster_key: audience_a_cluster
+          spark_python_task:
+            python_file: jobs/scripts/deliver.py
+            parameters: ["audience_a"]
+
+      email_notifications:
+        on_failure:
+          - ${ALERT_EMAIL}
+        on_success:
+          - ${ALERT_EMAIL}
+
+      timeout_seconds: 10800   # 3 hours max
