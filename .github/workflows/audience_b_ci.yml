@@ -7,14 +7,14 @@ on:
       - audience-b-prod
     paths:
       - "audiences/audience_b/**"
-      - "shared/insights_framework/**"
+      - "shared/**"
   pull_request:
     branches:
       - audience-b-dev
       - audience-b-iat
     paths:
       - "audiences/audience_b/**"
-      - "shared/insights_framework/**"
+      - "shared/**"
 
 jobs:
   test:
@@ -31,7 +31,9 @@ jobs:
           python-version: "3.11"
 
       - name: Install shared framework
-        run: pip install -e shared/insights_framework
+        run: |
+          cd shared/insights_framework
+          pip install -e .
 
       - name: Install test dependencies
         run: pip install pytest pyyaml
@@ -40,4 +42,6 @@ jobs:
         run: pytest shared/insights_framework/tests/ -v
 
       - name: Run Audience B integration tests
-        run: pytest audiences/audience_b/tests/ -v
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:${{ github.workspace }}/audiences/audience_b"
+          pytest audiences/audience_b/tests/ -v
