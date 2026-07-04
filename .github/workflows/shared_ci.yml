@@ -1,0 +1,26 @@
+name: Shared CI
+
+on:
+  push:
+    branches: [shared-iat, shared-prod]
+    paths: ["shared/**"]
+  pull_request:
+    branches: [shared-dev, shared-iat]
+    paths: ["shared/**"]
+
+jobs:
+  test:
+    name: Shared — unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with: {python-version: "3.11"}
+      - name: Install shared framework
+        run: pip install -e shared/
+      - name: Install pytest
+        run: pip install pytest
+      - name: Verify install
+        run: python -c "import insights_framework; print('OK')"
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
