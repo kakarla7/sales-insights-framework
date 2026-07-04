@@ -1,0 +1,71 @@
+# Base template — all audience jobs inherit this structure
+# Copy this file and replace AUDIENCE_NAME and CRON_SCHEDULE
+
+resources:
+  jobs:
+    AUDIENCE_NAME_job:
+      name: "AUDIENCE_NAME daily pipeline"
+
+      # Schedule — set per audience
+      schedule:
+        quartz_cron_expression: "CRON_SCHEDULE"
+        timezone_id: "America/New_York"
+        pause_status: UNPAUSED
+
+      # Git source — always runs from prod branch
+      git_source:
+        url: https://github.com/kakarla7/sales-insights-framework
+        provider: gitHub
+        branch: "AUDIENCE_NAME-prod"
+
+      # Job cluster — shared across tasks
+      job_clusters:
+        - job_cluster_key: AUDIENCE_NAME_cluster
+          new_cluster:
+            spark_version: "13.3.x-scala2.12"
+            node_type_id: "i3.xlarge"
+            num_workers: 2
+            spark_env_vars:
+              AUDIENCE_ID: "AUDIENCE_NAME"
+
+      # Tasks — drift check always runs before model
+      tasks:
+        - task_key: install_packages
+          job_cluster_key: AUDIENCE_NAME_cluster
+          spark_python_task:
+            python_file: jobs/scripts/install_packages.py
+            parameters: ["AUDIENCE_NAME"]
+
+        - task_key: drift_check
+          depends_on:
+            - task_key: install_packages
+          job_cluster_key: AUDIENCE_NAME_cluster
+          spark_python_task:
+            python_file: audiences/AUDIENCE_NAME/detector.py
+            parameters: ["--config", "audiences/AUDIENCE_NAME/config.yaml"]
+
+        - task_key: model_run
+          depends_on:
+            - task_key: drift_check
+          job_cluster_key: AUDIENCE_NAME_cluster
+          spark_python_task:
+            python_file: audiences/AUDIENCE_NAME/model.py
+            parameters: ["--config", "audiences/AUDIENCE_NAME/config.yaml"]
+
+        - task_key: deliver
+          depends_on:
+            - task_key: model_run
+          job_cluster_key: AUDIENCE_NAME_cluster
+          spark_python_task:
+            python_file: jobs/scripts/deliver.py
+            parameters: ["AUDIENCE_NAME"]
+
+      # Notifications
+      email_notifications:
+        on_failure:
+          - ${ALERT_EMAIL}
+        on_success:
+          - ${ALERT_EMAIL}
+
+      # Timeout — fail if job runs more than 3 hours
+      timeout_seconds: 10800
