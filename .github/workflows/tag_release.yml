@@ -1,0 +1,53 @@
+name: Tag Release — Prod Deploy
+
+on:
+  push:
+    tags:
+      - "sbs-client/v*.*.*"
+      - "sbs-prospect/v*.*.*"
+
+jobs:
+  release:
+    name: Tag detected — trigger prod pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run shared unit tests (prod gate)
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Detect audience from tag
+        id: detect
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          if [[ $TAG == sbs-client* ]]; then
+            echo "audience=sbs_client" >> $GITHUB_OUTPUT
+          elif [[ $TAG == sbs-prospect* ]]; then
+            echo "audience=sbs_prospect" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run audience integration tests
+        run: |
+          cd audiences/${{ steps.detect.outputs.audience }}
+          pytest tests/ -v
+
+      - name: Simulate prod deploy
+        run: |
+          echo "✓ Tag: ${{ steps.detect.outputs.tag }}"
+          echo "✓ Audience: ${{ steps.detect.outputs.audience }}"
+          echo "✓ All tests passed — triggering prod Databricks job..."
+          echo "✓ In real setup: call Databricks REST API here"
