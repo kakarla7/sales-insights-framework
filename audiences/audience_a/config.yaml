@@ -1,8 +1,8 @@
-audience_id: SBS_CLIENT
-description: SBS small business client model
+audience_id: Audience A
+description: Audeince A
 shared_version: ">=1.0.0,<2.0.0"
 model_version: "1.0.0"
-account_filter: "segment = 'SBS' AND type = 'CLIENT'"
-sf_sync_target: SBS_Client_Queue__c
+account_filter: "segment = 'Audeince' AND type = 'A'"
+sf_sync_target: Audeince_A_Queue__c
 delivery_sla: "08:00"
 operation: addition
