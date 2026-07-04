@@ -1,8 +1,0 @@
-audience_id: SBS_CLIENT
-description: SBS small business client model
-shared_version: ">=1.0.0,<2.0.0"
-model_version: "1.0.0"
-account_filter: "segment = 'SBS' AND type = 'CLIENT'"
-sf_sync_target: SBS_Client_Queue__c
-delivery_sla: "08:00"
-operation: addition
