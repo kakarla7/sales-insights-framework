@@ -1,0 +1,45 @@
+name: Audience B CI
+
+on:
+  push:
+    branches:
+      - audience-b-iat
+      - audience-b-prod
+    paths:
+      - "audiences/audience_b/**"
+      - "shared/insights_framework/**"
+  pull_request:
+    branches:
+      - audience-b-dev
+      - audience-b-iat
+    paths:
+      - "audiences/audience_b/**"
+      - "shared/insights_framework/**"
+
+jobs:
+  test:
+    name: Audience B — install, unit tests, integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Run Audience B integration tests
+        run: |
+          cd audiences/audience_b
+          pytest tests/ -v
