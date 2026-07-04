@@ -1,0 +1,38 @@
+name: Audience A — revert shared on CI fail
+
+on:
+  workflow_run:
+    workflows: ["Audience A CI"]
+    types: [completed]
+    branches: [audience-a-iat, audience-a-prod]
+
+jobs:
+  revert:
+    name: Revert shared/ if CI failed
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get branch name
+        id: branch
+        run: echo "branch=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+      - name: Revert shared/ to previous commit
+        run: |
+          BRANCH="${{ steps.branch.outputs.branch }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout $BRANCH
+          PREV=$(git log --oneline --diff-filter=M -- shared/ | grep "sync: shared" | head -1 | awk "{print $1}")
+          if [ -n "$PREV" ]; then
+            git checkout ${PREV}^ -- shared/
+            git commit -m "revert: shared/ auto-reverted — CI failed on $BRANCH"
+            git push origin $BRANCH
+            echo "shared/ reverted on $BRANCH"
+          else
+            echo "No previous shared sync found to revert to"
+          fi
