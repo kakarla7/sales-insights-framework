@@ -1,0 +1,41 @@
+name: Shared CI
+
+on:
+  push:
+    branches:
+      - shared-iat
+      - shared-prod
+    paths:
+      - "shared/**"
+  pull_request:
+    branches:
+      - shared-dev
+      - shared-iat
+    paths:
+      - "shared/**"
+
+jobs:
+  test:
+    name: Shared framework — unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Confirm
+        run: echo "✓ Shared unit tests passed — safe to cut shared tag"
