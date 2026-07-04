@@ -1,8 +1,0 @@
-audience_id: SBS_PROSPECT
-description: SBS small business prospect model
-shared_version: ">=1.0.0,<2.0.0"
-model_version: "1.0.0"
-account_filter: "segment = 'SBS' AND type = 'PROSPECT'"
-sf_sync_target: SBS_Prospect_Queue__c
-delivery_sla: "08:00"
-operation: multiplication
