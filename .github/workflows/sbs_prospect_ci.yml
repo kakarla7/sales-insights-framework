@@ -1,0 +1,45 @@
+name: SBS Prospect CI
+
+on:
+  push:
+    branches:
+      - sbs-prospect-iat
+      - sbs-prospect-prod
+    paths:
+      - "audiences/sbs_prospect/**"
+      - "shared/insights_framework/**"
+  pull_request:
+    branches:
+      - sbs-prospect-dev
+      - sbs-prospect-iat
+    paths:
+      - "audiences/sbs_prospect/**"
+      - "shared/insights_framework/**"
+
+jobs:
+  test:
+    name: SBS Prospect — install, unit tests, integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Run SBS Prospect integration tests
+        run: |
+          cd audiences/sbs_prospect
+          pytest tests/ -v
