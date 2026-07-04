@@ -3,8 +3,8 @@ name: Tag Release — Prod Deploy
 on:
   push:
     tags:
-      - "sbs-client/v*.*.*"
-      - "sbs-prospect/v*.*.*"
+      - "audience-a/v*.*.*"
+      - "audience-b/v*.*.*"
 
 jobs:
   release:
@@ -34,10 +34,10 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          if [[ $TAG == sbs-client* ]]; then
-            echo "audience=sbs_client" >> $GITHUB_OUTPUT
-          elif [[ $TAG == sbs-prospect* ]]; then
-            echo "audience=sbs_prospect" >> $GITHUB_OUTPUT
+          if [[ $TAG == audience-a* ]]; then
+            echo "audience=audience_a" >> $GITHUB_OUTPUT
+          elif [[ $TAG == audience-b* ]]; then
+            echo "audience=audience_b" >> $GITHUB_OUTPUT
           fi
 
       - name: Run audience integration tests
