@@ -36,26 +36,34 @@ jobs:
             echo "tag_type=unknown" >> $GITHUB_OUTPUT
           fi
 
-  # ── SHARED TAG: run shared tests only ──
+  # ── SHARED TAG: run shared tests only, no Databricks deploy ──
   shared_release:
-    name: Shared release — run unit tests
+    name: Shared release — unit tests only
     needs: detect
     if: needs.detect.outputs.tag_type == 'shared'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: shared-prod           # always test against shared-prod branch
+
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+
       - name: Install shared framework
         run: pip install -e shared/insights_framework
+
       - name: Run shared unit tests
         run: pytest shared/insights_framework/tests/ -v
-      - name: Confirm shared release
+
+      - name: Summary
         run: |
           echo "✓ shared-v${{ needs.detect.outputs.shared_ver }} released"
-          echo "✓ Audiences can now pin to this version in their config.yaml"
+          echo "✓ No Databricks deploy — shared is a package, not a job"
+          echo "✓ Audiences can now update shared_version in config.yaml"
+          echo "✓ Next: audience teams cut audience tags to pick up new shared version"
 
   # ── AUDIENCE TAG: run tests + deploy to Databricks ──
   audience_release:
@@ -66,6 +74,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -79,7 +88,7 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest pyyaml
 
-      - name: Run shared unit tests (prod gate)
+      - name: Run shared unit tests
         run: pytest shared/insights_framework/tests/ -v
 
       - name: Run audience integration tests
@@ -97,12 +106,12 @@ jobs:
           ")
           echo "config_shared_ver=$SHARED_VER" >> $GITHUB_OUTPUT
 
-      - name: Validate tag matches config shared version
+      - name: Validate tag shared version matches config.yaml
         run: |
           TAG_VER="${{ needs.detect.outputs.shared_ver }}"
           CFG_VER="${{ steps.config.outputs.config_shared_ver }}"
           if [ "$TAG_VER" != "$CFG_VER" ]; then
-            echo "ERROR: Tag shared version ($TAG_VER) does not match config.yaml ($CFG_VER)"
+            echo "ERROR: Tag shared version ($TAG_VER) != config.yaml ($CFG_VER)"
             exit 1
           fi
           echo "✓ Shared version matches: $TAG_VER"
@@ -113,9 +122,7 @@ jobs:
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: |
-          databricks bundle deploy \
-            --target prod \
-            --var="audience=${{ needs.detect.outputs.audience }}"
+          databricks bundle deploy --target prod
 
       - name: Summary
         run: |
