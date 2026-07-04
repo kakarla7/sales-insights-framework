@@ -1,0 +1,30 @@
+name: Audience A CI
+
+on:
+  push:
+    branches: [audience-a-iat, audience-a-prod]
+    paths: ["audiences/audience_a/**", "shared/**"]
+  pull_request:
+    branches: [audience-a-dev, audience-a-iat]
+    paths: ["audiences/audience_a/**", "shared/**"]
+
+jobs:
+  test:
+    name: Audience A — unit + integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with: {python-version: "3.11"}
+      - name: Install shared framework
+        run: pip install -e shared/
+      - name: Install pytest
+        run: pip install pytest pyyaml
+      - name: Verify install
+        run: python -c "import insights_framework; print('OK')"
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+      - name: Run Audience A integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/audiences/audience_a
+        run: pytest audiences/audience_a/tests/ -v
