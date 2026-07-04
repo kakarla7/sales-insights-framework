@@ -1,24 +1,24 @@
-name: SBS Prospect CI
+name: Audience B CI
 
 on:
   push:
     branches:
-      - sbs-prospect-iat
-      - sbs-prospect-prod
+      - audience-b-iat
+      - audience-b-prod
     paths:
-      - "audiences/sbs_prospect/**"
+      - "audiences/audience_b/**"
       - "shared/insights_framework/**"
   pull_request:
     branches:
-      - sbs-prospect-dev
-      - sbs-prospect-iat
+      - audience-b-dev
+      - audience-b-iat
     paths:
-      - "audiences/sbs_prospect/**"
+      - "audiences/audience_b/**"
       - "shared/insights_framework/**"
 
 jobs:
   test:
-    name: SBS Prospect — install, unit tests, integration tests
+    name: Audience B — install, unit tests, integration tests
     runs-on: ubuntu-latest
 
     steps:
@@ -39,7 +39,7 @@ jobs:
       - name: Run shared unit tests
         run: pytest shared/insights_framework/tests/ -v
 
-      - name: Run SBS Prospect integration tests
+      - name: Run Audience B integration tests
         run: |
-          cd audiences/sbs_prospect
+          cd audiences/audience_b
           pytest tests/ -v
