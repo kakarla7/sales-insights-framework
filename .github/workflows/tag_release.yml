@@ -1,27 +1,80 @@
-name: Tag Release — Prod Deploy
+name: Tag Release — Deploy to Databricks
 
 on:
   push:
     tags:
-      - "audience-a/v*.*.*"
-      - "audience-b/v*.*.*"
+      - "shared-v*"
+      - "shared-v*--audience-a-v*"
+      - "shared-v*--audience-b-v*"
 
 jobs:
-  release:
-    name: Tag detected — trigger prod pipeline
+  detect:
+    name: Detect tag type
+    runs-on: ubuntu-latest
+    outputs:
+      tag_type: ${{ steps.detect.outputs.tag_type }}
+      audience: ${{ steps.detect.outputs.audience }}
+      shared_ver: ${{ steps.detect.outputs.shared_ver }}
+      audience_ver: ${{ steps.detect.outputs.audience_ver }}
+
+    steps:
+      - name: Detect tag type and parse versions
+        id: detect
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=$TAG"
+
+          if [[ $TAG =~ ^shared-v([0-9]+\.[0-9]+\.[0-9]+)--audience-([a-z]+)-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "tag_type=audience" >> $GITHUB_OUTPUT
+            echo "shared_ver=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "audience=audience_${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
+            echo "audience_ver=${BASH_REMATCH[3]}" >> $GITHUB_OUTPUT
+          elif [[ $TAG =~ ^shared-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "tag_type=shared" >> $GITHUB_OUTPUT
+            echo "shared_ver=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+  # ── SHARED TAG: run shared tests only ──
+  shared_release:
+    name: Shared release — run unit tests
+    needs: detect
+    if: needs.detect.outputs.tag_type == 'shared'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+      - name: Confirm shared release
+        run: |
+          echo "✓ shared-v${{ needs.detect.outputs.shared_ver }} released"
+          echo "✓ Audiences can now pin to this version in their config.yaml"
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+  # ── AUDIENCE TAG: run tests + deploy to Databricks ──
+  audience_release:
+    name: Audience release — test + deploy to Databricks
+    needs: detect
+    if: needs.detect.outputs.tag_type == 'audience'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
       - name: Install shared framework
         run: pip install -e shared/insights_framework
+
+      - name: Install Databricks CLI
+        run: pip install databricks-cli databricks-sdk
 
       - name: Install test dependencies
         run: pip install pytest pyyaml
@@ -29,25 +82,44 @@ jobs:
       - name: Run shared unit tests (prod gate)
         run: pytest shared/insights_framework/tests/ -v
 
-      - name: Detect audience from tag
-        id: detect
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          if [[ $TAG == audience-a* ]]; then
-            echo "audience=audience_a" >> $GITHUB_OUTPUT
-          elif [[ $TAG == audience-b* ]]; then
-            echo "audience=audience_b" >> $GITHUB_OUTPUT
-          fi
-
       - name: Run audience integration tests
         run: |
-          cd audiences/${{ steps.detect.outputs.audience }}
+          cd audiences/${{ needs.detect.outputs.audience }}
           pytest tests/ -v
 
-      - name: Simulate prod deploy
+      - name: Read shared version from config
+        id: config
         run: |
-          echo "✓ Tag: ${{ steps.detect.outputs.tag }}"
-          echo "✓ Audience: ${{ steps.detect.outputs.audience }}"
-          echo "✓ All tests passed — triggering prod Databricks job..."
-          echo "✓ In real setup: call Databricks REST API here"
+          SHARED_VER=$(python3 -c "
+          import yaml
+          cfg = yaml.safe_load(open('audiences/${{ needs.detect.outputs.audience }}/config.yaml'))
+          print(cfg['shared_version'])
+          ")
+          echo "config_shared_ver=$SHARED_VER" >> $GITHUB_OUTPUT
+
+      - name: Validate tag matches config shared version
+        run: |
+          TAG_VER="${{ needs.detect.outputs.shared_ver }}"
+          CFG_VER="${{ steps.config.outputs.config_shared_ver }}"
+          if [ "$TAG_VER" != "$CFG_VER" ]; then
+            echo "ERROR: Tag shared version ($TAG_VER) does not match config.yaml ($CFG_VER)"
+            exit 1
+          fi
+          echo "✓ Shared version matches: $TAG_VER"
+
+      - name: Deploy job to Databricks via Asset Bundle
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          databricks bundle deploy \
+            --target prod \
+            --var="audience=${{ needs.detect.outputs.audience }}"
+
+      - name: Summary
+        run: |
+          echo "✓ Tag: shared-v${{ needs.detect.outputs.shared_ver }}--${{ needs.detect.outputs.audience }}-v${{ needs.detect.outputs.audience_ver }}"
+          echo "✓ Audience: ${{ needs.detect.outputs.audience }}"
+          echo "✓ All tests passed"
+          echo "✓ Databricks job deployed and scheduled"
