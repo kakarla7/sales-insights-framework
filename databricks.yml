@@ -1,0 +1,30 @@
+# Databricks Asset Bundle — root config
+# Deploys all audience jobs to Databricks on tag push
+# Docs: https://docs.databricks.com/dev-tools/bundles/index.html
+
+bundle:
+  name: sales-insights-framework
+
+workspace:
+  host: ${DATABRICKS_HOST}       # set in GitHub Actions secret
+  token: ${DATABRICKS_TOKEN}     # set in GitHub Actions secret
+
+# Include all job definitions
+include:
+  - jobs/*.yaml
+
+# Environment targets
+targets:
+  dev:
+    mode: development
+    workspace:
+      host: ${DATABRICKS_HOST}
+
+  iat:
+    workspace:
+      host: ${DATABRICKS_HOST}
+
+  prod:
+    mode: production
+    workspace:
+      host: ${DATABRICKS_HOST}
