@@ -31,17 +31,18 @@ jobs:
           python-version: "3.11"
 
       - name: Install shared framework
-        run: |
-          cd shared/insights_framework
-          pip install -e .
+        run: pip install -e shared/
 
       - name: Install test dependencies
         run: pip install pytest pyyaml
+
+      - name: Verify insights_framework installed
+        run: python -c "import insights_framework; print('insights_framework OK')"
 
       - name: Run shared unit tests
         run: pytest shared/insights_framework/tests/ -v
 
       - name: Run Audience A integration tests
-        run: |
-          export PYTHONPATH="${PYTHONPATH}:${{ github.workspace }}/audiences/audience_a"
-          pytest audiences/audience_a/tests/ -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}/audiences/audience_a
+        run: pytest audiences/audience_a/tests/ -v
