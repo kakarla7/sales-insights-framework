@@ -1,21 +1,21 @@
 """
-SBS Client model — extends ModelAudience.
+Audeince A model — extends ModelAudience.
 Operation: ADDITION (a + b)
-Override only what is specific to SBS Client.
+Override only what is specific to Audeince A
 """
 from insights_framework import ModelAudience
 
 
 class Model(ModelAudience):
     """
-    SBS Client pipeline.
+    Audeince A pipeline.
     Inherits full pipeline from ModelAudience.
     Overrides: train() with addition logic.
     """
 
     def train(self, data, params):
         """
-        SBS Client trains on addition.
+        Audeince A trains on addition.
         In real use: replace with XGBoost propensity model.
         """
         a = data.get("a", 0)
@@ -25,7 +25,7 @@ class Model(ModelAudience):
         return result
 
     def evaluate(self, model, data):
-        """SBS Client evaluation — checks result is positive."""
+        """Audeince A evaluation — checks result is positive."""
         return {
             "result": model,
             "valid": model >= 0,
