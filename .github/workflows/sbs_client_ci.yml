@@ -1,0 +1,45 @@
+name: SBS Client CI
+
+on:
+  push:
+    branches:
+      - sbs-client-iat
+      - sbs-client-prod
+    paths:
+      - "audiences/sbs_client/**"
+      - "shared/insights_framework/**"
+  pull_request:
+    branches:
+      - sbs-client-dev
+      - sbs-client-iat
+    paths:
+      - "audiences/sbs_client/**"
+      - "shared/insights_framework/**"
+
+jobs:
+  test:
+    name: SBS Client — install, unit tests, integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install shared framework
+        run: pip install -e shared/insights_framework
+
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+
+      - name: Run shared unit tests
+        run: pytest shared/insights_framework/tests/ -v
+
+      - name: Run SBS Client integration tests
+        run: |
+          cd audiences/sbs_client
+          pytest tests/ -v
